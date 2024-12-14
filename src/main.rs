@@ -63,8 +63,8 @@ async fn main() -> Result<()> {
     let mut reader = BufReader::new(stderr).lines();
     while let Some(line) = reader.next_line().await? {
         if let Ok(pairs) = parser::parse(&line) {
-            for (k, v) in pairs {
-                dashboard.set(k, v).await;
+            for pair in pairs {
+                dashboard.set(pair.key, pair.value).await;
             }
         }
     }
