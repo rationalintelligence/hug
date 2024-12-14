@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
 
     let mut reader = BufReader::new(stderr).lines();
     while let Some(line) = reader.next_line().await? {
-        let value = parser::parse_line(&line);
+        let value = parser::parse(&line)?;
     }
     Ok(())
 }
