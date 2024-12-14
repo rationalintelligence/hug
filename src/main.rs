@@ -12,6 +12,7 @@ use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::Command,
     sync::{RwLock, RwLockReadGuard},
+    time::{sleep, Duration},
 };
 
 #[derive(Error, Debug)]
@@ -77,6 +78,8 @@ async fn main() -> Result<()> {
             }
         }
     }
+
+    sleep(Duration::from_secs(5)).await;
 
     dashboard.stop();
     dashboard.join();

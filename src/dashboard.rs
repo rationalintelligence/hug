@@ -93,11 +93,7 @@ impl DashboardTask {
                     .header(
                         Row::new(vec!["Key", "Value"]).style(Style::default().fg(Color::Yellow)),
                     )
-                    .block(
-                        Block::default()
-                            .borders(Borders::ALL)
-                            .title("CLI DashboardTask"),
-                    )
+                    .block(Block::default().borders(Borders::ALL).title("Dashboard"))
                     .widths(&[Constraint::Percentage(50), Constraint::Percentage(50)]);
 
                     f.render_widget(table, size);
