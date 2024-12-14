@@ -10,24 +10,50 @@ use ratatui::style::{Color, Style};
 use ratatui::widgets::{Block, Borders, Row, Table};
 use ratatui::Terminal;
 use std::io;
-use std::thread;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 pub struct Dashboard {
-    state: State,
+    active: Arc<AtomicBool>,
+    handle: JoinHandle<()>,
 }
 
 impl Dashboard {
-    pub fn new(state: State) -> Self {
-        Self { state }
+    pub fn start(state: State) -> Self {
+        let active = Arc::new(AtomicBool::new(true));
+        let task = DashboardTask {
+            active: active.clone(),
+            state,
+        };
+        let handle = task.spawn();
+        Self { active, handle }
     }
 
-    pub fn spawn(mut self) {
+    pub fn stop(&mut self) {
+        self.active.store(false, Ordering::Relaxed);
+    }
+
+    pub fn join(self) {
+        self.handle.join().ok();
+    }
+}
+
+struct DashboardTask {
+    active: Arc<AtomicBool>,
+    state: State,
+}
+
+impl DashboardTask {
+    pub fn spawn(mut self) -> JoinHandle<()> {
         thread::spawn(move || {
             self.init().ok();
             self.render().ok();
             self.uninit().ok();
-        });
+        })
     }
 
     fn init(&mut self) -> Result<(), Error> {
@@ -49,7 +75,7 @@ impl Dashboard {
         let mut terminal = Terminal::new(backend)?;
 
         // TODO: Add an atomic
-        loop {
+        while self.active.load(Ordering::Relaxed) {
             {
                 let pairs = self.state.blocking_read();
                 terminal.draw(|f| {
@@ -70,7 +96,7 @@ impl Dashboard {
                     .block(
                         Block::default()
                             .borders(Borders::ALL)
-                            .title("CLI Dashboard"),
+                            .title("CLI DashboardTask"),
                     )
                     .widths(&[Constraint::Percentage(50), Constraint::Percentage(50)]);
 
@@ -79,5 +105,7 @@ impl Dashboard {
             }
             thread::sleep(Duration::from_millis(100));
         }
+
+        Ok(())
     }
 }

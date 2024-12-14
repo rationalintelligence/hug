@@ -67,7 +67,7 @@ async fn main() -> Result<()> {
     let stderr = child.stdout.take().ok_or(CliError::Stderr)?;
     let mut state = State::new();
 
-    Dashboard::new(state.clone()).spawn();
+    let mut dashboard = Dashboard::start(state.clone());
 
     let mut reader = BufReader::new(stderr).lines();
     while let Some(line) = reader.next_line().await? {
@@ -77,6 +77,9 @@ async fn main() -> Result<()> {
             }
         }
     }
+
+    dashboard.stop();
+    dashboard.join();
 
     Ok(())
 }
