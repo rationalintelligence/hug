@@ -1,3 +1,5 @@
+mod parser;
+
 use anyhow::Result;
 use clap::Parser;
 use std::process::Stdio;
@@ -38,7 +40,7 @@ async fn main() -> Result<()> {
 
     let mut reader = BufReader::new(stderr).lines();
     while let Some(line) = reader.next_line().await? {
-        println!("{line}");
+        let value = parser::parse_line(&line);
     }
     Ok(())
 }
