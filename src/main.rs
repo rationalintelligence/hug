@@ -2,6 +2,7 @@ mod parser;
 
 use anyhow::Result;
 use clap::Parser;
+use std::collections::BTreeMap;
 use std::process::Stdio;
 use thiserror::Error;
 use tokio::{
@@ -23,6 +24,21 @@ struct Opts {
     command: Vec<String>,
 }
 
+#[derive(Default)]
+struct Dashboard {
+    values: BTreeMap<String, String>,
+}
+
+impl Dashboard {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.values.insert(key.into(), value.into());
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let opts = Opts::parse();
@@ -37,10 +53,14 @@ async fn main() -> Result<()> {
         .spawn()?;
 
     let stderr = child.stderr.take().ok_or(CliError::Stderr)?;
-
+    let mut dashboard = Dashboard::new();
     let mut reader = BufReader::new(stderr).lines();
     while let Some(line) = reader.next_line().await? {
-        let value = parser::parse(&line)?;
+        if let Ok(pairs) = parser::parse(&line) {
+            for (k, v) in pairs {
+                dashboard.set(k, v);
+            }
+        }
     }
     Ok(())
 }
