@@ -1,28 +1,26 @@
 use nom::{
-    bytes::complete::{tag, take_until},
-    character::complete::{char, multispace0},
+    bytes::complete::{tag, take_while1},
+    character::complete::char,
     error::Error,
     multi::separated_list0,
-    sequence::{delimited, separated_pair, terminated},
+    sequence::{preceded, separated_pair},
     Err, IResult,
 };
 
-fn parse_key_value(input: &str) -> IResult<&str, (&str, &str)> {
-    separated_pair(
-        delimited(multispace0, take_until("="), multispace0),
-        char('='),
-        delimited(multispace0, take_until(","), multispace0),
-    )(input)
+fn identifier(input: &str) -> IResult<&str, &str> {
+    take_while1(|c: char| c.is_alphanumeric() || c == '_')(input)
 }
 
-fn parse_key_value_pairs(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
-    separated_list0(char(','), terminated(parse_key_value, multispace0))(input)
+fn key_value_pair(input: &str) -> IResult<&str, (&str, &str)> {
+    separated_pair(identifier, char('='), identifier)(input)
+}
+
+fn key_value_pairs(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
+    separated_list0(char(','), key_value_pair)(input)
 }
 
 fn parse_line(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
-    let (input, _) = take_until("!")(input)?;
-    let (input, _) = tag("!")(input)?;
-    parse_key_value_pairs(input)
+    preceded(tag("!"), key_value_pairs)(input)
 }
 
 pub fn parse(input: &str) -> Result<Vec<(&str, &str)>, Err<Error<String>>> {
