@@ -9,7 +9,7 @@ use thiserror::Error;
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::Command,
-    sync::RwLock,
+    sync::{RwLock, RwLockReadGuard},
 };
 
 #[derive(Error, Debug)]
@@ -39,6 +39,10 @@ impl Dashboard {
     pub async fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.values.write().await.insert(key.into(), value.into());
     }
+
+    pub async fn read(&self) -> RwLockReadGuard<BTreeMap<String, String>> {
+        self.values.read().await
+    }
 }
 
 #[tokio::main]
@@ -54,7 +58,7 @@ async fn main() -> Result<()> {
         .stderr(Stdio::piped())
         .spawn()?;
 
-    let stderr = child.stderr.take().ok_or(CliError::Stderr)?;
+    let stderr = child.stdout.take().ok_or(CliError::Stderr)?;
     let mut dashboard = Dashboard::new();
     let mut reader = BufReader::new(stderr).lines();
     while let Some(line) = reader.next_line().await? {
@@ -64,5 +68,12 @@ async fn main() -> Result<()> {
             }
         }
     }
+
+    println!("Output");
+    let values = dashboard.read().await;
+    for (key, value) in &*values {
+        println!("{key} = {value}");
+    }
+
     Ok(())
 }
