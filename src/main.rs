@@ -1,5 +1,7 @@
+mod dashboard;
 mod parser;
 
+use crate::dashboard::Dashboard;
 use anyhow::Result;
 use clap::Parser;
 use std::collections::BTreeMap;
@@ -27,11 +29,11 @@ struct Opts {
 }
 
 #[derive(Default, Clone)]
-struct Dashboard {
+pub struct State {
     values: Arc<RwLock<BTreeMap<String, String>>>,
 }
 
-impl Dashboard {
+impl State {
     pub fn new() -> Self {
         Self::default()
     }
@@ -42,6 +44,10 @@ impl Dashboard {
 
     pub async fn read(&self) -> RwLockReadGuard<BTreeMap<String, String>> {
         self.values.read().await
+    }
+
+    pub fn blocking_read(&self) -> RwLockReadGuard<BTreeMap<String, String>> {
+        self.values.blocking_read()
     }
 }
 
@@ -59,20 +65,17 @@ async fn main() -> Result<()> {
         .spawn()?;
 
     let stderr = child.stdout.take().ok_or(CliError::Stderr)?;
-    let mut dashboard = Dashboard::new();
+    let mut state = State::new();
+
+    Dashboard::new(state.clone()).spawn();
+
     let mut reader = BufReader::new(stderr).lines();
     while let Some(line) = reader.next_line().await? {
         if let Ok(pairs) = parser::parse(&line) {
             for pair in pairs {
-                dashboard.set(pair.key, pair.value).await;
+                state.set(pair.key, pair.value).await;
             }
         }
-    }
-
-    println!("Output");
-    let values = dashboard.read().await;
-    for (key, value) in &*values {
-        println!("{key} = {value}");
     }
 
     Ok(())
