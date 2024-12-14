@@ -4,10 +4,12 @@ use anyhow::Result;
 use clap::Parser;
 use std::collections::BTreeMap;
 use std::process::Stdio;
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     process::Command,
+    sync::RwLock,
 };
 
 #[derive(Error, Debug)]
@@ -24,9 +26,9 @@ struct Opts {
     command: Vec<String>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Dashboard {
-    values: BTreeMap<String, String>,
+    values: Arc<RwLock<BTreeMap<String, String>>>,
 }
 
 impl Dashboard {
@@ -34,8 +36,8 @@ impl Dashboard {
         Self::default()
     }
 
-    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
-        self.values.insert(key.into(), value.into());
+    pub async fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.values.write().await.insert(key.into(), value.into());
     }
 }
 
@@ -58,7 +60,7 @@ async fn main() -> Result<()> {
     while let Some(line) = reader.next_line().await? {
         if let Ok(pairs) = parser::parse(&line) {
             for (k, v) in pairs {
-                dashboard.set(k, v);
+                dashboard.set(k, v).await;
             }
         }
     }
