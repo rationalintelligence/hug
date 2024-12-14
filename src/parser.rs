@@ -1,5 +1,5 @@
 use nom::{
-    bytes::complete::{tag, take_while1},
+    bytes::complete::{tag, take_till1, take_while1},
     character::complete::char,
     error::Error,
     multi::separated_list0,
@@ -11,8 +11,12 @@ fn identifier(input: &str) -> IResult<&str, &str> {
     take_while1(|c: char| c.is_alphanumeric() || c == '_')(input)
 }
 
+fn value(input: &str) -> IResult<&str, &str> {
+    take_till1(|c: char| c.is_whitespace() || c == ',')(input)
+}
+
 fn key_value_pair(input: &str) -> IResult<&str, (&str, &str)> {
-    separated_pair(identifier, char('='), identifier)(input)
+    separated_pair(identifier, char('='), value)(input)
 }
 
 fn key_value_pairs(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
