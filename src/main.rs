@@ -1,9 +1,12 @@
 mod dashboard;
+mod hub;
 mod parser;
 
 use crate::dashboard::Dashboard;
+use crate::hub::Hub;
 use anyhow::Result;
 use clap::Parser;
+use crb::kit::actor::Standalone;
 use std::collections::BTreeMap;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -14,6 +17,7 @@ use tokio::{
     sync::{RwLock, RwLockReadGuard},
     time::{sleep, Duration},
 };
+use uiio::protocol::RecordRead;
 
 #[derive(Error, Debug)]
 enum CliError {
@@ -66,23 +70,32 @@ async fn main() -> Result<()> {
         .spawn()?;
 
     let stderr = child.stdout.take().ok_or(CliError::Stderr)?;
+
+    let mut hub = Hub::new().spawn();
+
     let mut state = State::new();
 
     let mut dashboard = Dashboard::start(state.clone());
 
     let mut reader = BufReader::new(stderr).lines();
     while let Some(line) = reader.next_line().await? {
+        let record: RecordRead = serde_json::from_str(&line)?;
+        /*
         if let Ok(pairs) = parser::parse(&line) {
             for pair in pairs {
                 state.set(pair.key, pair.value).await;
             }
         }
+        */
     }
 
     sleep(Duration::from_secs(5)).await;
 
     dashboard.stop();
     dashboard.join();
+
+    hub.interrupt()?;
+    hub.join().await?;
 
     Ok(())
 }
