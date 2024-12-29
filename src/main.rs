@@ -1,12 +1,11 @@
 mod dashboard;
-mod hub;
 mod parser;
 
 use crate::dashboard::Dashboard;
-use crate::hub::Hub;
 use anyhow::Result;
 use clap::Parser;
 use crb::kit::actor::Standalone;
+use hug::hub::Hub;
 use std::collections::BTreeMap;
 use std::process::Stdio;
 use std::sync::Arc;

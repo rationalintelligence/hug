@@ -2,12 +2,6 @@ use anyhow::Result;
 use async_trait::async_trait;
 use crb::kit::actor::{Actor, ActorSession, OnRequest, Request, Standalone};
 
-pub struct AddFlow {}
-
-impl Request for AddFlow {
-    type Response = ();
-}
-
 pub struct Hub {}
 
 impl Hub {
@@ -23,13 +17,19 @@ impl Actor for Hub {
     type Context = ActorSession<Self>;
 }
 
+// ADD FLOW
+
+pub struct AddFlow {
+    pub class: String,
+}
+
+impl Request for AddFlow {
+    type Response = ();
+}
+
 #[async_trait]
 impl OnRequest<AddFlow> for Hub {
-    async fn on_request(
-        &mut self,
-        request: AddFlow,
-        ctx: &mut Self::Context,
-    ) -> Result<T::Response> {
+    async fn on_request(&mut self, request: AddFlow, ctx: &mut Self::Context) -> Result<()> {
         todo!()
     }
 }
