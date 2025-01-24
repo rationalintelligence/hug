@@ -72,10 +72,11 @@ impl OnEvent<Event> for HubApp {
 
 #[async_trait]
 impl OnEvent<CommandEvent> for HubApp {
-    async fn handle(&mut self, event: CommandEvent, _ctx: &mut Context<Self>) -> Result<()> {
+    async fn handle(&mut self, event: CommandEvent, ctx: &mut Context<Self>) -> Result<()> {
         match event {
             CommandEvent::Stdout { key, value } => {
                 self.state.set(key, value);
+                ctx.do_next(Next::do_sync(Render));
             }
             CommandEvent::Terminated(_) => {}
         }
