@@ -4,9 +4,10 @@ use crate::launcher::{CommandEvent, CommandWatcher};
 use crate::state::AppState;
 use anyhow::Result;
 use async_trait::async_trait;
-use crb::agent::{Agent, Context, DoAsync, DoSync, Duty, Next, OnEvent};
+use crb::agent::{Agent, Context, DoAsync, Duty, Next, OnEvent};
+use crb::core::time::Duration;
 use crb::core::Slot;
-use crb::superagent::{Supervisor, SupervisorSession};
+use crb::superagent::{Supervisor, SupervisorSession, Timer};
 use crossterm::event::{Event, KeyCode};
 use ratatui::DefaultTerminal;
 
@@ -14,6 +15,7 @@ pub struct HubApp {
     args: RunArgs,
     terminal: Slot<DefaultTerminal>,
     state: AppState,
+    timer: Timer<Render>,
 }
 
 impl HubApp {
@@ -22,6 +24,7 @@ impl HubApp {
             args,
             terminal: Slot::empty(),
             state: AppState::new(),
+            timer: Timer::new(Render),
         }
     }
 }
@@ -43,6 +46,9 @@ struct Configure;
 #[async_trait]
 impl Duty<Configure> for HubApp {
     async fn handle(&mut self, _: Configure, ctx: &mut Context<Self>) -> Result<Next<Self>> {
+        self.timer.add_listener(&ctx);
+        self.timer.set_duration(Duration::from_millis(250));
+
         let terminal = ratatui::try_init()?;
         self.terminal.fill(terminal)?;
         let drainer = EventsDrainer::new(&ctx);
@@ -51,48 +57,53 @@ impl Duty<Configure> for HubApp {
         let (watcher, _tx) = CommandWatcher::new(self.args.clone(), &ctx);
         ctx.spawn_agent(watcher, ());
 
-        Ok(Next::do_sync(Render))
+        Ok(Next::events())
     }
 }
 
 #[async_trait]
 impl OnEvent<Event> for HubApp {
     async fn handle(&mut self, event: Event, ctx: &mut Context<Self>) -> Result<()> {
-        let next_state = match event {
+        match event {
             Event::Key(event) => match event.code {
-                KeyCode::Char('q') => Next::do_async(Terminate),
-                _ => Next::do_sync(Render),
+                KeyCode::Char('q') => {
+                    ctx.do_next(Next::do_async(Terminate));
+                }
+                _ => {}
             },
-            _ => Next::do_sync(Render),
+            _ => {}
         };
-        ctx.do_next(next_state);
         Ok(())
     }
 }
 
 #[async_trait]
 impl OnEvent<CommandEvent> for HubApp {
-    async fn handle(&mut self, event: CommandEvent, ctx: &mut Context<Self>) -> Result<()> {
+    async fn handle(&mut self, event: CommandEvent, _ctx: &mut Context<Self>) -> Result<()> {
         match event {
             CommandEvent::Stdout { key, value } => {
                 self.state.set(key, value);
-                ctx.do_next(Next::do_sync(Render));
+                // ctx.do_next(Next::do_sync(Render));
             }
-            CommandEvent::Terminated(_) => {}
+            CommandEvent::Terminated(_) => {
+                // ctx.do_next(Next::do_sync(Render));
+            }
         }
         Ok(())
     }
 }
 
+#[derive(Clone)]
 struct Render;
 
-impl DoSync<Render> for HubApp {
-    fn once(&mut self, _: &mut Render) -> Result<Next<Self>> {
+#[async_trait]
+impl OnEvent<Render> for HubApp {
+    async fn handle(&mut self, _: Render, _ctx: &mut Context<Self>) -> Result<()> {
         let terminal = self.terminal.get_mut()?;
         terminal.draw(|frame| {
             self.state.render(frame);
         })?;
-        Ok(Next::events())
+        Ok(())
     }
 }
 
