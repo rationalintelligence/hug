@@ -31,7 +31,7 @@ impl AppState {
 
         let list = Block::default()
             .borders(Borders::ALL)
-            .title("Key-Value Data");
+            .title("Hug Dashboard");
         let inner_area = list.inner(chunks[0]);
         frame.render_widget(list, chunks[0]);
 

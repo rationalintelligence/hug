@@ -47,7 +47,9 @@ struct Configure;
 impl Duty<Configure> for HubApp {
     async fn handle(&mut self, _: Configure, ctx: &mut Context<Self>) -> Result<Next<Self>> {
         self.timer.add_listener(&ctx);
-        self.timer.set_duration(Duration::from_millis(250));
+        self.timer.set_repeat(true);
+        self.timer.set_duration(Duration::from_millis(100));
+        self.timer.on();
 
         let terminal = ratatui::try_init()?;
         self.terminal.fill(terminal)?;
