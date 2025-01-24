@@ -2,7 +2,7 @@
 name = "hug"
 version = "0.0.3"
 edition = "2021"
-description = "On-the-fly UI"
+description = "tui dashboard for uiio"
 license = "MIT"
 repository = "https://github.com/runtime-blocks/hug"
 
