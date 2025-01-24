@@ -1,4 +1,6 @@
+use crate::args::RunArgs;
 use crate::events::EventsDrainer;
+use crate::launcher::{CommandEvent, CommandWatcher};
 use crate::state::AppState;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -6,22 +8,18 @@ use crb::agent::{Agent, Context, DoAsync, DoSync, Duty, Next, OnEvent};
 use crb::core::Slot;
 use crb::superagent::{Supervisor, SupervisorSession};
 use crossterm::event::{Event, KeyCode};
-use ratatui::{
-    prelude::{Constraint, Direction, Layout},
-    style::{Color, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph},
-    DefaultTerminal,
-};
+use ratatui::DefaultTerminal;
 
 pub struct HubApp {
+    args: RunArgs,
     terminal: Slot<DefaultTerminal>,
     state: AppState,
 }
 
 impl HubApp {
-    pub fn new() -> Self {
+    pub fn new(args: RunArgs) -> Self {
         Self {
+            args,
             terminal: Slot::empty(),
             state: AppState::new(),
         }
@@ -49,6 +47,10 @@ impl Duty<Configure> for HubApp {
         self.terminal.fill(terminal)?;
         let drainer = EventsDrainer::new(&ctx);
         ctx.spawn_agent(drainer, ());
+
+        let (watcher, _tx) = CommandWatcher::new(self.args.clone(), &ctx);
+        ctx.spawn_agent(watcher, ());
+
         Ok(Next::do_sync(Render))
     }
 }
@@ -68,49 +70,27 @@ impl OnEvent<Event> for HubApp {
     }
 }
 
+#[async_trait]
+impl OnEvent<CommandEvent> for HubApp {
+    async fn handle(&mut self, event: CommandEvent, _ctx: &mut Context<Self>) -> Result<()> {
+        match event {
+            CommandEvent::Stdout { key, value } => {
+                self.state.set(key, value);
+            }
+            CommandEvent::Terminated(_) => {}
+        }
+        Ok(())
+    }
+}
+
 struct Render;
 
 impl DoSync<Render> for HubApp {
     fn once(&mut self, _: &mut Render) -> Result<Next<Self>> {
         let terminal = self.terminal.get_mut()?;
-
-        let data = vec![("Key1", "Value1"), ("Key2", "Value2"), ("Key3", "Value3")];
-
         terminal.draw(|frame| {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref())
-                .split(frame.size());
-
-            let list = Block::default()
-                .borders(Borders::ALL)
-                .title("Key-Value Data");
-            let inner_area = list.inner(chunks[0]);
-            frame.render_widget(list, chunks[0]);
-
-            let chunks = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                .split(inner_area);
-
-            let left_column: Vec<Line> = data
-                .iter()
-                .map(|(key, _)| Line::from(Span::styled(*key, Style::default().fg(Color::Yellow))))
-                .collect();
-            let left_paragraph = Paragraph::new(left_column);
-
-            let right_column: Vec<Line> = data
-                .iter()
-                .map(|(_, value)| {
-                    Line::from(Span::styled(*value, Style::default().fg(Color::Green)))
-                })
-                .collect();
-            let right_paragraph = Paragraph::new(right_column);
-
-            frame.render_widget(left_paragraph, chunks[0]);
-            frame.render_widget(right_paragraph, chunks[1]);
+            self.state.render(frame);
         })?;
-
         Ok(Next::events())
     }
 }
